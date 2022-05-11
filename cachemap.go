@@ -52,10 +52,10 @@ type cacheMapInterface interface {
 func (cm *cacheMap) cacheRun() {
 	for {
 		select {
-		case <-time.After(1 * time.Second):
+		case <-time.After(800 * time.Millisecond):
 			cm.lock.Lock()
 			for k, v := range cm.m {
-				if v.UpdateTime.Add(v.TTL).Before(time.Now()) {
+				if v.TTL > 0 && v.UpdateTime.Add(v.TTL).Before(time.Now()) {
 					if v.callFunc != nil {
 						v.callFunc(*v)
 					}
@@ -142,7 +142,7 @@ func (cm *cacheMap) del(key interface{}) error {
 	}
 	item, ok := cm.m[key]
 	if ok {
-		if item.UpdateTime.Add(item.TTL).Before(time.Now()) {
+		if item.TTL > 0 && item.UpdateTime.Add(item.TTL).Before(time.Now()) {
 			delete(cm.m, key)
 			return errors.New(ErrorKeyNotFound)
 		} else {
