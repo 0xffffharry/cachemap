@@ -253,3 +253,14 @@ func (cm *cacheMap) foreach(fn CallFuncType) {
 func (w *cacheMapWrapper) Foreach(fn CallFuncType) {
 	w.foreach(fn)
 }
+
+// 清除所有键值对
+func (w *cacheMapWrapper) Clear() {
+	w.clear()
+}
+
+func (cm *cacheMap) clear() {
+	cm.lock.Lock()
+	defer cm.lock.Unlock()
+	cm.m = make(map[interface{}]*CacheItem)
+}
