@@ -26,10 +26,15 @@ type cacheMap struct {
 	lock       sync.RWMutex
 	stopChan   chan struct{}
 	stopStatus bool
+	sleepTime  time.Duration
 }
 
 type cacheMapWrapper struct {
 	*cacheMap
+}
+
+type Option struct {
+	SleepTime time.Duration
 }
 
 const (
@@ -52,7 +57,9 @@ type cacheMapInterface interface {
 func (cm *cacheMap) cacheRun() {
 	for {
 		select {
-		case <-time.After(800 * time.Millisecond):
+		case <-cm.stopChan:
+			return
+		case <-time.After(cm.sleepTime):
 			cm.lock.Lock()
 			for k, v := range cm.m {
 				if v.TTL > 0 && v.UpdateTime.Add(v.TTL).Before(time.Now()) {
@@ -63,8 +70,6 @@ func (cm *cacheMap) cacheRun() {
 				}
 			}
 			cm.lock.Unlock()
-		case <-cm.stopChan:
-			return
 		}
 	}
 }
@@ -75,6 +80,7 @@ func newCacheMap() *cacheMap {
 		lock:       sync.RWMutex{},
 		stopChan:   make(chan struct{}),
 		stopStatus: false,
+		sleepTime:  800 * time.Millisecond,
 	}
 	return cm
 }
@@ -82,13 +88,20 @@ func newCacheMap() *cacheMap {
 //停止运行
 func (w *cacheMapWrapper) Stop() {
 	w.stopChan <- struct{}{}
-	close(w.stopChan)
 	w.stopStatus = true
+	close(w.stopChan)
 }
 
 // 创建一个 Cache Map
-func NewCacheMap() CacheMap {
+func NewCacheMap(options ...Option) CacheMap {
 	w := &cacheMapWrapper{newCacheMap()}
+	if len(options) > 0 {
+		for _, v := range options {
+			if v.SleepTime > 0 {
+				w.sleepTime = v.SleepTime
+			}
+		}
+	}
 	go w.cacheRun()
 	runtime.SetFinalizer(w, (*cacheMapWrapper).Stop)
 	return w
